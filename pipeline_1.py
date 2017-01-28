@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
 import cv2
+from math import *
 #%matplotlib inline
 
 def pipeline(img):
@@ -28,25 +29,55 @@ def pipeline(img):
 		(int(W * 0.9) , int(H)),
 		(int(W * 0.1), int(H))]])
 
-	print(vertices)
 
 	cv2.fillPoly(mask, vertices, ignore_mask_color)
 	masked_edges = cv2.bitwise_and(edges, mask)
 
+	# Define the Hough transform parameters
+	# Make a blank the same size as our image to draw on
+	rho = 1 # distance resolution in pixels of the Hough grid
+	theta = np.pi/90 # angular resolution in radians of the Hough grid
+	threshold = 15     # minimum number of votes (intersections in Hough grid cell)
+	min_line_length = 70 #minimum number of pixels making up a line
+	max_line_gap = 30    # maximum gap in pixels between connectable line segments
+	line_image = np.copy(img)*0 # creating a blank to draw lines on
 
-	return masked_edges
+
+	# Run Hough on edge detected image
+	# Output "lines" is an array containing endpoints of detected line segments
+	lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([]),
+	                            min_line_length, max_line_gap)
+
+	for line in lines:
+		for x1, y1, x2, y2 in line:
+
+			adj = abs(x1 - x2)
+			opp = abs(y1 - y2)
+
+			at = adj / opp
+			# if the slope is higher than the threshold, it is probably not a lane
+			if  degrees(atan(at)) > 60 : continue
+
+			cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
+
+	edges3col = np.dstack((edges, edges, edges))
+
+	fine = cv2.addWeighted(img, 0.8, line_image, 1, 0)
+	#fine = cv2.addWeighted(edges3col, 0.8, line_image, 1, 0)
+
+	return fine
 
 
 
 img_list = os.listdir("test_images/")
-img_list = img_list[0:1]
+#img_list = img_list[0:3]
 
 i = 1
 for img_file in img_list:
     img = mpimg.imread("test_images/" + img_file)
     print(img_file)
     img_processed = pipeline(img)
-    plt.subplot(len(img_list), 1, i)
+    plt.subplot(1, len(img_list), i)
     plt.imshow(img_processed)
     i += 1
 
