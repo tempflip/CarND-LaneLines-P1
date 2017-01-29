@@ -35,7 +35,7 @@ def pipeline(img):
 	H = img.shape[0]
 	W = img.shape[1]	
 
-	Y1_CUT = int(H * 0.5)
+	Y1_CUT = int(H * 0.6)
 	Y2_CUT = int(H)
 
 	vertices = np.array([[
@@ -63,29 +63,49 @@ def pipeline(img):
 	lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([]),
 	                            min_line_length, max_line_gap)
 
+	## a line with less slope probably is not a lane
+	MIN_SLOPE = 0.6
+	
+	## a map with the line candidates
+	## key : slope m's sign (pos / neg)
+	line_map = { True : [], False : []}
+
 	for line in lines:
 		for x1, y1, x2, y2 in line:
 
-			adj = abs(x1 - x2)
-			opp = abs(y1 - y2)
-
-			if (opp == 0) : continue
-
-			at = adj / opp
-
-			# if the slope is higher than the threshold, it is probably not a lane
-			if  degrees(atan(at)) > 60 : continue
-
-
 			m, b = get_line(x1, y1, x2, y2)
-			print ('{} {}'.format(m, b))
+			if (abs(m) < MIN_SLOPE) : continue
+			line_map[m > 0].append((m, b))
 
 
+			cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 4)
 
-			cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 10)
+			#cv2.line(line_image, (get_x(m, b, Y1_CUT), Y1_CUT), (get_x(m, b, Y2_CUT), Y2_CUT), (0, 0, 255), 8   )
 
-			cv2.line(line_image, (get_x(m, b, Y1_CUT), Y1_CUT), (get_x(m, b, Y2_CUT), Y2_CUT), (0, 0, 255), 8   )
 
+	## calculating the avarage lines from the candidates (positive and negative slope candidates)
+	line_avg = { True : [], False : []}
+	for key in line_map:
+		m_sum = 0
+		b_sum = 0
+		for m, b in line_map[key]:
+			m_sum += m
+			b_sum += b
+
+		m_avg = m_sum / len(line_map[key])
+		b_avg = b_sum / len(line_map[key])
+		line_avg[key] = m_avg, b_avg
+
+	## drawing the final candidate lane
+	# positive slope
+	pos_m, pos_b = line_avg[True]
+	px1, py1, px2, py2 = get_x(pos_m, pos_b, Y1_CUT), Y1_CUT, get_x(pos_m, pos_b, Y2_CUT), Y2_CUT 
+	# negative slope
+	neg_m, neg_b = line_avg[False]
+	nx1, ny1, nx2, ny2 = get_x(neg_m, neg_b, Y1_CUT), Y1_CUT, get_x(neg_m, neg_b, Y2_CUT), Y2_CUT 
+
+	cv2.line(line_image, (px1, py1), (px2, py2), (0, 0, 255), 10   )
+	cv2.line(line_image, (nx1, ny1), (nx2, ny2), (0, 0, 255), 10   )
 
 
 	edges3col = np.dstack((edges, edges, edges))
