@@ -64,7 +64,7 @@ def pipeline(img):
 	                            min_line_length, max_line_gap)
 
 	## a line with less slope probably is not a lane
-	MIN_SLOPE = 0.6
+	MIN_SLOPE = 0.5
 	
 	## a map with the line candidates
 	## key : slope m's sign (pos / neg)
@@ -84,8 +84,9 @@ def pipeline(img):
 
 
 	## calculating the avarage lines from the candidates (positive and negative slope candidates)
-	line_avg = { True : [], False : []}
+	line_avg = {}
 	for key in line_map:
+		if len(line_map[key]) == 0 : continue
 		m_sum = 0
 		b_sum = 0
 		for m, b in line_map[key]:
@@ -96,22 +97,31 @@ def pipeline(img):
 		b_avg = b_sum / len(line_map[key])
 		line_avg[key] = m_avg, b_avg
 
-	## drawing the final candidate lane
+	## drawing the final candidate lanes
 	# positive slope
-	pos_m, pos_b = line_avg[True]
-	px1, py1, px2, py2 = get_x(pos_m, pos_b, Y1_CUT), Y1_CUT, get_x(pos_m, pos_b, Y2_CUT), Y2_CUT 
+	if True in line_avg:
+		pos_m, pos_b = line_avg[True]
+		px1, py1, px2, py2 = get_x(pos_m, pos_b, Y1_CUT), Y1_CUT, get_x(pos_m, pos_b, Y2_CUT), Y2_CUT 
+	else :
+		px1, py1, px2, py2  = 0, 0, 0, H 
 	# negative slope
-	neg_m, neg_b = line_avg[False]
-	nx1, ny1, nx2, ny2 = get_x(neg_m, neg_b, Y1_CUT), Y1_CUT, get_x(neg_m, neg_b, Y2_CUT), Y2_CUT 
+	if False in line_avg:
+		neg_m, neg_b = line_avg[False]
+		nx1, ny1, nx2, ny2 = get_x(neg_m, neg_b, Y1_CUT), Y1_CUT, get_x(neg_m, neg_b, Y2_CUT), Y2_CUT 
+	else :
+		nx1, ny1, nx2, ny2  = W+100, 0, W, H
 
 	cv2.line(line_image, (px1, py1), (px2, py2), (0, 0, 255), 10   )
 	cv2.line(line_image, (nx1, ny1), (nx2, ny2), (0, 0, 255), 10   )
+
 
 
 	edges3col = np.dstack((edges, edges, edges))
 
 	fine = cv2.addWeighted(img, 0.8, line_image, 1, 0)
 	#fine = cv2.addWeighted(edges3col, 0.8, line_image, 1, 0)
+
+	cv2.fillPoly(fine, np.array([[(px1, py1), (px2, py2), (nx2, ny2), (nx1, ny1)]]), (200, 200, 0))
 
 	return fine
 
