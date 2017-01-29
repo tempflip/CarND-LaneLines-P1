@@ -8,8 +8,19 @@ import cv2
 from math import *
 #%matplotlib inline
 
+def get_line(x1, y1, x2, y2):
+	m = (y2 - y1)  / (x2 - x1)
+	b1 = y1 - m * x1
+	return m, b1
+
+def get_y(m, b, x):
+	return int(m * x  + b)
+
+def get_x(m, b, y):
+	return int((y-b) / m)
+
 def pipeline(img):
-    
+
 	gray = cv2.cvtColor(img,cv2.COLOR_RGB2GRAY)
 	kernel_size = 7
 	blur_gray = cv2.GaussianBlur(gray,(kernel_size, kernel_size),0)
@@ -22,7 +33,11 @@ def pipeline(img):
 	ignore_mask_color = 255  
 
 	H = img.shape[0]
-	W = img.shape[1]		
+	W = img.shape[1]	
+
+	Y1_CUT = int(H * 0.5)
+	Y2_CUT = int(H)
+
 	vertices = np.array([[
 		(int(W * 0.49), int(H * 0.5)),
 		(int(W * 0.51), int(H * 0.5)),
@@ -61,7 +76,17 @@ def pipeline(img):
 			# if the slope is higher than the threshold, it is probably not a lane
 			if  degrees(atan(at)) > 60 : continue
 
-			cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
+
+			m, b = get_line(x1, y1, x2, y2)
+			print ('{} {}'.format(m, b))
+
+
+
+			cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 10)
+
+			cv2.line(line_image, (get_x(m, b, Y1_CUT), Y1_CUT), (get_x(m, b, Y2_CUT), Y2_CUT), (0, 0, 255), 8   )
+
+
 
 	edges3col = np.dstack((edges, edges, edges))
 
@@ -73,7 +98,7 @@ def pipeline(img):
 
 
 img_list = os.listdir("test_images/")
-#img_list = img_list[0:3]
+img_list = img_list[1:2]
 
 i = 1
 for img_file in img_list:
