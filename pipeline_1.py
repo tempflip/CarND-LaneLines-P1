@@ -54,7 +54,10 @@ def pipeline(img):
 			adj = abs(x1 - x2)
 			opp = abs(y1 - y2)
 
+			if (opp == 0) : continue
+
 			at = adj / opp
+
 			# if the slope is higher than the threshold, it is probably not a lane
 			if  degrees(atan(at)) > 60 : continue
 
