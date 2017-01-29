@@ -118,7 +118,7 @@ def pipeline(img):
 
 
 img_list = os.listdir("test_images/")
-img_list = img_list[1:2]
+img_list = img_list[0:1]
 
 i = 1
 for img_file in img_list:
