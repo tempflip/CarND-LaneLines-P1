@@ -11,6 +11,22 @@ from math import *
 POS_LINE_STACK = []
 NEG_LINE_STACK = []
 
+POS_LINE_HISTORY = []
+NEG_LINE_HISTORY = []
+
+def get_m_b_smoothed(mb, hist):
+	HIST_FRAMES = 5
+	hist.append(mb)
+	
+	m_sum = 0
+	b_sum = 0
+	l = len(hist[-HIST_FRAMES:])
+	for (m, b) in hist[-HIST_FRAMES:]:
+		m_sum += m
+		b_sum += b
+
+	return (m_sum / l, b_sum / l)
+
 def get_line(x1, y1, x2, y2):
 	m = (y2 - y1)  / (x2 - x1)
 	b1 = y1 - m * x1
@@ -21,7 +37,7 @@ def get_x(m, b, y):
 
 def get_lane_coords(line_avg, Y1_CUT, Y2_CUT, W, H):
 	if True in line_avg:
-		pos_m, pos_b = line_avg[True]
+		pos_m, pos_b = get_m_b_smoothed(line_avg[True], POS_LINE_HISTORY)
 		px1, py1, px2, py2 = get_x(pos_m, pos_b, Y1_CUT), Y1_CUT, get_x(pos_m, pos_b, Y2_CUT), Y2_CUT 
 		POS_LINE_STACK.append((px1, py1, px2, py2))
 	else :
@@ -30,7 +46,7 @@ def get_lane_coords(line_avg, Y1_CUT, Y2_CUT, W, H):
 		#px1, py1, px2, py2  = W, 0, W, H 
 	# negative slope
 	if False in line_avg:
-		neg_m, neg_b = line_avg[False]
+		neg_m, neg_b = get_m_b_smoothed(line_avg[False], NEG_LINE_HISTORY)
 		nx1, ny1, nx2, ny2 = get_x(neg_m, neg_b, Y1_CUT), Y1_CUT, get_x(neg_m, neg_b, Y2_CUT), Y2_CUT 
 		NEG_LINE_STACK.append((nx1, ny1, nx2, ny2))
 	else :
