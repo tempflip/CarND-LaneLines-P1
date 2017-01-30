@@ -13,11 +13,23 @@ def get_line(x1, y1, x2, y2):
 	b1 = y1 - m * x1
 	return m, b1
 
-def get_y(m, b, x):
-	return int(m * x  + b)
-
 def get_x(m, b, y):
 	return int((y-b) / m)
+
+def get_lane_coords(line_avg, Y1_CUT, Y2_CUT, W, H):
+	if True in line_avg:
+		pos_m, pos_b = line_avg[True]
+		px1, py1, px2, py2 = get_x(pos_m, pos_b, Y1_CUT), Y1_CUT, get_x(pos_m, pos_b, Y2_CUT), Y2_CUT 
+	else :
+		px1, py1, px2, py2  = W, 0, W, H 
+	# negative slope
+	if False in line_avg:
+		neg_m, neg_b = line_avg[False]
+		nx1, ny1, nx2, ny2 = get_x(neg_m, neg_b, Y1_CUT), Y1_CUT, get_x(neg_m, neg_b, Y2_CUT), Y2_CUT 
+	else :
+		nx1, ny1, nx2, ny2  = 0, 0, 0, H
+
+	return px1, py1, px2, py2, nx1, ny1, nx2, ny2
 
 def pipeline(img):
 
@@ -55,8 +67,6 @@ def pipeline(img):
 	threshold = 15     # minimum number of votes (intersections in Hough grid cell)
 	min_line_length = 70 #minimum number of pixels making up a line
 	max_line_gap = 30    # maximum gap in pixels between connectable line segments
-	line_image = np.copy(img)*0 # creating a blank to draw lines on
-
 
 	# Run Hough on edge detected image
 	# Output "lines" is an array containing endpoints of detected line segments
@@ -72,16 +82,9 @@ def pipeline(img):
 
 	for line in lines:
 		for x1, y1, x2, y2 in line:
-
 			m, b = get_line(x1, y1, x2, y2)
 			if (abs(m) < MIN_SLOPE) : continue
 			line_map[m > 0].append((m, b))
-
-
-			cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 4)
-
-			#cv2.line(line_image, (get_x(m, b, Y1_CUT), Y1_CUT), (get_x(m, b, Y2_CUT), Y2_CUT), (0, 0, 255), 8   )
-
 
 	## calculating the avarage lines from the candidates (positive and negative slope candidates)
 	line_avg = {}
@@ -99,35 +102,18 @@ def pipeline(img):
 
 	## drawing the final candidate lanes
 	# positive slope
-	if True in line_avg:
-		pos_m, pos_b = line_avg[True]
-		px1, py1, px2, py2 = get_x(pos_m, pos_b, Y1_CUT), Y1_CUT, get_x(pos_m, pos_b, Y2_CUT), Y2_CUT 
-	else :
-		px1, py1, px2, py2  = 0, 0, 0, H 
-	# negative slope
-	if False in line_avg:
-		neg_m, neg_b = line_avg[False]
-		nx1, ny1, nx2, ny2 = get_x(neg_m, neg_b, Y1_CUT), Y1_CUT, get_x(neg_m, neg_b, Y2_CUT), Y2_CUT 
-	else :
-		nx1, ny1, nx2, ny2  = W+100, 0, W, H
+	
+	px1, py1, px2, py2, nx1, ny1, nx2, ny2 = get_lane_coords(line_avg, Y1_CUT, Y2_CUT, W, H)
 
-	cv2.line(line_image, (px1, py1), (px2, py2), (0, 0, 255), 10   )
-	cv2.line(line_image, (nx1, ny1), (nx2, ny2), (0, 0, 255), 10   )
+	lane_cover = cv2.fillPoly(np.copy(img) * 0, np.array([[(px1, py1), (px2, py2), (nx2, ny2), (nx1, ny1)]]), (200, 200, 0))
+	final = cv2.addWeighted(img, 1, lane_cover, 0.5, 0)
 
-
-
-	edges3col = np.dstack((edges, edges, edges))
-
-	fine = cv2.addWeighted(img, 0.8, line_image, 1, 0)
-	#fine = cv2.addWeighted(edges3col, 0.8, line_image, 1, 0)
-
-	cv2.fillPoly(fine, np.array([[(px1, py1), (px2, py2), (nx2, ny2), (nx1, ny1)]]), (200, 200, 0))
-
-	return fine
+	return final
 
 
 
 img_list = os.listdir("test_images/")
+img_list = img_list[0:1]
 
 i = 1
 for img_file in img_list:
