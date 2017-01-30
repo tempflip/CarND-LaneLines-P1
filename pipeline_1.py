@@ -8,6 +8,9 @@ import cv2
 from math import *
 #%matplotlib inline
 
+POS_LINE_STACK = []
+NEG_LINE_STACK = []
+
 def get_line(x1, y1, x2, y2):
 	m = (y2 - y1)  / (x2 - x1)
 	b1 = y1 - m * x1
@@ -20,14 +23,19 @@ def get_lane_coords(line_avg, Y1_CUT, Y2_CUT, W, H):
 	if True in line_avg:
 		pos_m, pos_b = line_avg[True]
 		px1, py1, px2, py2 = get_x(pos_m, pos_b, Y1_CUT), Y1_CUT, get_x(pos_m, pos_b, Y2_CUT), Y2_CUT 
+		POS_LINE_STACK.append((px1, py1, px2, py2))
 	else :
-		px1, py1, px2, py2  = W, 0, W, H 
+		# no line? use the previous
+		px1, py1, px2, py2 = POS_LINE_STACK[-1]
+		#px1, py1, px2, py2  = W, 0, W, H 
 	# negative slope
 	if False in line_avg:
 		neg_m, neg_b = line_avg[False]
 		nx1, ny1, nx2, ny2 = get_x(neg_m, neg_b, Y1_CUT), Y1_CUT, get_x(neg_m, neg_b, Y2_CUT), Y2_CUT 
+		NEG_LINE_STACK.append((nx1, ny1, nx2, ny2))
 	else :
-		nx1, ny1, nx2, ny2  = 0, 0, 0, H
+		nx1, ny1, nx2, ny2 = NEG_LINE_STACK[-1]
+		#nx1, ny1, nx2, ny2  = 0, 0, 0, H
 
 	return px1, py1, px2, py2, nx1, ny1, nx2, ny2
 
