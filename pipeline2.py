@@ -18,6 +18,10 @@ MIN_ABS_LINE_SLOPE = 0.2
 
 LANE_CUT = 0.6
 
+MOVING_AVG_FRAMES = 20
+
+lane_lines_history = []
+
 def get_line_func(x1, y1, x2, y2):
 	m = (y2 - y1)  / (x2 - x1)
 	b1 = y1 - m * x1
@@ -27,6 +31,57 @@ def get_line_func(x1, y1, x2, y2):
 def get_x(m, b, y):
 	if m == inf or b == inf:  return 0
 	return int((y-b) / m)
+
+# filters the lines returned by the hough transform
+# 1, returns lines in a map, grouped by positive/negative slope
+# 2, draws the lines on the image
+def filter_lines(lines, img):
+	img_with_lines = np.array(img)
+	line_map = {True  : [], False : []}
+	for line in lines:
+		for (x1, y1, x2, y2) in line:
+			m, b = get_line_func(x1, y1, x2, y2)
+			# filtering by slope
+			if (abs(m) < MIN_ABS_LINE_SLOPE) : continue
+			# grouping the lines by slope
+			line_map[m > 0].append((m, b))
+			cv2.line(img_with_lines, (x1, y1), (x2, y2), (255, 0, 0), 3)
+	return line_map, img_with_lines
+
+# 1, calculating the avarage lines (post/neg)from the filtered line map, one for each slope direction
+# 2, makes a moving-average smoothing
+def get_lane_lines(line_map):
+	final_slopes = {}
+
+	#calculating the average for the current frame lines
+	for direction in line_map:
+		if len(line_map[direction]) == 0:
+			final_slopes[direction] = (1,0)
+			continue
+
+		m_sum = 0
+		b_sum = 0
+		for m, b in line_map[direction]:
+			m_sum += m
+			b_sum += b
+		final_slopes[direction] = (m_sum / len(line_map[direction]), b_sum / len(line_map[direction]))
+	
+	lane_lines_history.append(final_slopes)
+
+	# calculating the m and b moving avgs both for positive and negative directions
+	avg_map = {True : [], False : []}
+	for f in lane_lines_history[-MOVING_AVG_FRAMES:]:
+		avg_map[True].append(f[True])
+		avg_map[False].append(f[False])
+
+
+	pos_mean = np.mean(np.array(avg_map[True]), axis = 0)
+	neg_mean = np.mean(np.array(avg_map[False]), axis = 0)
+
+	return {
+		True : (pos_mean[0], pos_mean[1]),
+		False : (neg_mean[0], neg_mean[1])
+	}
 
 def pipeline(img):
 	H = img.shape[0]
@@ -52,43 +107,16 @@ def pipeline(img):
 	lines = cv2.HoughLinesP(masked_edges, H_RHO, H_THETA, H_THRESHOLD, np.array([]),
 	                            H_MIN_LINE_LENGTH, H_MAX_LINE_GAP)
 
-	## processing the line coords
-
 	# 2 lists for the lines.
 	# grouping them by slope direction (positive / negative)
-	line_map = {True  : [], False : []}
-
-	img_with_lines = np.array(img)
-	for line in lines:
-		for (x1, y1, x2, y2) in line:
-			m, b = get_line_func(x1, y1, x2, y2)
-
-			# filtering by slope
-			if (abs(m) < MIN_ABS_LINE_SLOPE) : continue
-
-			# grouping the lines by slope
-			line_map[m > 0].append((m, b))
-			cv2.line(img_with_lines, (x1, y1), (x2, y2), (255, 0, 0), 3)
-
-
+	line_map, img_with_lines = filter_lines(lines, img)
+	
 	## calculating the average slope, for both directions
-	final_slopes = {}
-	for direction in line_map:
-		if len(line_map[direction]) == 0:
-			final_slopes[direction] = (1,0)
-			continue
-
-		m_sum = 0
-		b_sum = 0
-		for m, b in line_map[direction]:
-			m_sum += m
-			b_sum += b
-		final_slopes[direction] = (m_sum / len(line_map[direction]), b_sum / len(line_map[direction]))
-
+	final_lines = get_lane_lines(line_map)
 
 	final_image = np.array(img)
-	for dir in final_slopes:
-		m, b = final_slopes[dir]
+	for dir in final_lines:
+		m, b = final_lines[dir]
 		cv2.line(final_image, (get_x(m, b, int(H * LANE_CUT)), int(H * LANE_CUT)), (get_x(m, b, H), H), (0, 255, 0), 3)
 
 
