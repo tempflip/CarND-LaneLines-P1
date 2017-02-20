@@ -4,8 +4,8 @@ from scipy import misc
 from moviepy.editor import VideoFileClip
 
 
-INPUT_VIDEO = "videos/clip1.mp4"
-OUTPUT_VIDEO = "out.mp4"
+INPUT_VIDEO = "videos/clip2.mp4"
+OUTPUT_VIDEO = "out2.mp4"
 
 def img_test():
 	img = misc.imread("images/frame_1_0086.png")

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy import misc
 
 INPUT_VIDEO = "astoria.mp4"
-OUTPUT_VIDEO = "video/clip2.mp4"
+OUTPUT_VIDEO = "videos/clip2.mp4"
 
 
 clip = VideoFileClip(INPUT_VIDEO)
