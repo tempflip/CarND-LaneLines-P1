@@ -13,7 +13,7 @@ def img_test():
 	plt.show()
 
 def video_test():
-	clip = VideoFileClip(INPUT_VIDEO).subclip(0,5)
+	clip = VideoFileClip(INPUT_VIDEO) #.subclip(0,5)
 	transformed = clip.fl_image(pipeline)
 	transformed.write_videofile(OUTPUT_VIDEO, audio=False)
 

@@ -26,7 +26,7 @@ MIN_ABS_LINE_SLOPE = 0.2
 
 LANE_CUT = 0.6
 
-MOVING_AVG_FRAMES = 10
+MOVING_AVG_FRAMES = 15
 
 lane_lines_history = []
 
@@ -89,15 +89,15 @@ def get_lane_lines(line_map, avg_frames = 1):
 
 
 	# if there are no candidates (can happen when there is a lot of noise on consecutive frames)
-	#if len(avg_map[True]) > 0:
-	pos_mean = np.mean(np.array(avg_map[True]), axis = 0)
-	#else:
-		#pos_mean = (1,0)
+	if len(avg_map[True]) > 0:
+		pos_mean = np.mean(np.array(avg_map[True]), axis = 0)
+	else:
+		pos_mean = (1,0)
 
-	#if len(avg_map[False]) > 0:
-	neg_mean = np.mean(np.array(avg_map[False]), axis = 0)
-	#else:
-	#	neg_mean = (1,0)
+	if len(avg_map[False]) > 0:
+		neg_mean = np.mean(np.array(avg_map[False]), axis = 0)
+	else:
+		neg_mean = (1,0)
 
 
 	return_map = {
