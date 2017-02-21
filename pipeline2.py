@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 from math import *
 
+# blur and canny parameters
 BLUR_KERNEL_SIZE = 5
 CANNY_LOW_THRESHOLD = 50
 CANNY_HIGH_THRESHOLD = 150
@@ -14,11 +15,18 @@ H_THRESHOLD = 15     # minimum number of votes (intersections in Hough grid cell
 H_MIN_LINE_LENGTH = 30 #minimum number of pixels making up a line
 H_MAX_LINE_GAP = 100    # maximum gap in pixels between connectable line segments
 
+# mask coordinates
+MASK_CUT_Y_TOP = 0.5
+MASK_CUT_X_TOP_LEFT = 0.45
+MASK_CUT_X_TOP_RIGHT = 0.45
+MASK_CUT_X_BOTTOM_LEFT = 0.05
+MASK_CUT_X_BOTTOM_RIGHT = 0.95
+
 MIN_ABS_LINE_SLOPE = 0.2
 
 LANE_CUT = 0.6
 
-MOVING_AVG_FRAMES = 20
+MOVING_AVG_FRAMES = 10
 
 lane_lines_history = []
 
@@ -45,12 +53,12 @@ def filter_lines(lines, img):
 			if (abs(m) < MIN_ABS_LINE_SLOPE) : continue
 			# grouping the lines by slope
 			line_map[m > 0].append((m, b))
-			cv2.line(img_with_lines, (x1, y1), (x2, y2), (255, 0, 0), 3)
+			cv2.line(img_with_lines, (x1, y1), (x2, y2), (255, 0, 0), 2)
 	return line_map, img_with_lines
 
 # 1, calculating the avarage lines (post/neg)from the filtered line map, one for each slope direction
 # 2, makes a moving-average smoothing
-def get_lane_lines(line_map):
+def get_lane_lines(line_map, avg_frames = 1):
 	final_slopes = {}
 
 	#calculating the average for the current frame lines
@@ -70,18 +78,36 @@ def get_lane_lines(line_map):
 
 	# calculating the m and b moving avgs both for positive and negative directions
 	avg_map = {True : [], False : []}
-	for f in lane_lines_history[-MOVING_AVG_FRAMES:]:
-		avg_map[True].append(f[True])
-		avg_map[False].append(f[False])
+	for f in lane_lines_history[-avg_frames:]:
+		m,b = f[True]
+		if m != inf and m != -inf:
+			avg_map[True].append(f[True])
+
+		m,b = f[False]
+		if m != inf and m != -inf:
+			avg_map[False].append(f[False])
 
 
+	# if there are no candidates (can happen when there is a lot of noise on consecutive frames)
+	#if len(avg_map[True]) > 0:
 	pos_mean = np.mean(np.array(avg_map[True]), axis = 0)
-	neg_mean = np.mean(np.array(avg_map[False]), axis = 0)
+	#else:
+		#pos_mean = (1,0)
 
-	return {
+	#if len(avg_map[False]) > 0:
+	neg_mean = np.mean(np.array(avg_map[False]), axis = 0)
+	#else:
+	#	neg_mean = (1,0)
+
+
+	return_map = {
 		True : (pos_mean[0], pos_mean[1]),
 		False : (neg_mean[0], neg_mean[1])
 	}
+
+
+
+	return return_map
 
 def pipeline(img):
 	H = img.shape[0]
@@ -93,14 +119,13 @@ def pipeline(img):
 	edges = cv2.Canny(blur_gray, CANNY_LOW_THRESHOLD, CANNY_HIGH_THRESHOLD)
 
 	## masking
-	vertices = np.array([[
-		(int(W * 0.39), int(H * 0.5)),
-		(int(W * 0.61), int(H * 0.5)),
-		(int(W * 0.9) , int(H)),
-		(int(W * 0.1), int(H))]])
+	mask_vertices = np.array([[
+		(int(W * MASK_CUT_X_TOP_LEFT), int(H * MASK_CUT_Y_TOP)),
+		(int(W * MASK_CUT_X_TOP_RIGHT), int(H * MASK_CUT_Y_TOP)),
+		(int(W * MASK_CUT_X_BOTTOM_RIGHT) , int(H)),
+		(int(W * MASK_CUT_X_BOTTOM_LEFT), int(H))]])
 	mask = np.zeros_like(edges)
-
-	mask = cv2.fillPoly(mask, vertices, 255)
+	mask = cv2.fillPoly(mask, mask_vertices, 255)
 	masked_edges = cv2.bitwise_and(edges, mask)
 
 	## getting the lines with a hough-transform
@@ -111,13 +136,35 @@ def pipeline(img):
 	# grouping them by slope direction (positive / negative)
 	line_map, img_with_lines = filter_lines(lines, img)
 	
-	## calculating the average slope, for both directions
-	final_lines = get_lane_lines(line_map)
+	# drawing the mask vertices on the image
+	cv2.line(img_with_lines, tuple(mask_vertices[0,0]), tuple(mask_vertices[0,3]), (0, 0, 200), 2)
+	cv2.line(img_with_lines, tuple(mask_vertices[0,1]), tuple(mask_vertices[0,2]), (0, 0, 200), 2)
 
-	final_image = np.array(img)
-	for dir in final_lines:
-		m, b = final_lines[dir]
-		cv2.line(final_image, (get_x(m, b, int(H * LANE_CUT)), int(H * LANE_CUT)), (get_x(m, b, H), H), (0, 255, 0), 3)
+	## calculating the average slope, for both directions
+
+	# calcutaing the line without moving avg
+	final_lines_1 = get_lane_lines(line_map, avg_frames = 1)
+	final_image_1 = np.array(img)
+	for dir in final_lines_1:
+		m, b = final_lines_1[dir]
+		cv2.line(final_image_1, (get_x(m, b, int(H * LANE_CUT)), int(H * LANE_CUT)), (get_x(m, b, H), H), (0, 255, 0), 3)
+
+	# calculating the lane, with moving avg
+	final_lines_moving = get_lane_lines(line_map, avg_frames = MOVING_AVG_FRAMES)
+	final_image_moving = np.array(img)
+
+	m_left, b_left = final_lines_moving[True]
+	m_right, b_right = final_lines_moving[False]
+	lane_cover_coords = np.array([[
+		(get_x(m_left, b_left, int(H * LANE_CUT)), int(H * LANE_CUT)),
+		(get_x(m_left, b_left, H), H),
+		(get_x(m_right, b_right, H), H),
+		(get_x(m_right, b_right, int(H * LANE_CUT)), int(H * LANE_CUT)),
+	]])
+	lane_cover = cv2.fillPoly(np.zeros_like(img), lane_cover_coords, (200, 0, 0))
+
+	#cv2.line(final_image_moving, (get_x(m, b, int(H * LANE_CUT)), int(H * LANE_CUT)), (get_x(m, b, H), H), (0, 255, 0), 3)
+		
 
 
 	# putting together the frame
@@ -125,7 +172,7 @@ def pipeline(img):
 	rgb_masked_edges = np.dstack((masked_edges, masked_edges, masked_edges))
 
 	left = np.concatenate((img_with_lines, rgb_masked_edges), axis = 0 )
-	right = np.concatenate((final_image, final_image), axis = 0)
+	right = np.concatenate((final_image_1, final_image_moving), axis = 0)
 
 	out = np.concatenate((left, right), axis = 1)
 	

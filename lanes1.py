@@ -4,8 +4,8 @@ from scipy import misc
 from moviepy.editor import VideoFileClip
 
 
-INPUT_VIDEO = "videos/clip2.mp4"
-OUTPUT_VIDEO = "out2.mp4"
+INPUT_VIDEO = "videos/clip1.mp4"
+OUTPUT_VIDEO = "out1.mp4"
 
 def img_test():
 	img = misc.imread("images/frame_1_0086.png")
@@ -18,5 +18,5 @@ def video_test():
 	transformed.write_videofile(OUTPUT_VIDEO, audio=False)
 
 
-#img_test()
-video_test()
+img_test()
+#video_test()
