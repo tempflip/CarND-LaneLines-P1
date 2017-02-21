@@ -151,18 +151,19 @@ def pipeline(img):
 
 	# calculating the lane, with moving avg
 	final_lines_moving = get_lane_lines(line_map, avg_frames = MOVING_AVG_FRAMES)
-	final_image_moving = np.array(img)
 
 	m_left, b_left = final_lines_moving[True]
 	m_right, b_right = final_lines_moving[False]
+	
 	lane_cover_coords = np.array([[
 		(get_x(m_left, b_left, int(H * LANE_CUT)), int(H * LANE_CUT)),
 		(get_x(m_left, b_left, H), H),
 		(get_x(m_right, b_right, H), H),
 		(get_x(m_right, b_right, int(H * LANE_CUT)), int(H * LANE_CUT)),
 	]])
-	lane_cover = cv2.fillPoly(np.zeros_like(img), lane_cover_coords, (200, 0, 0))
-	final_lines_moving = cv2.addWeighted(final_lines_moving, 1, lane_cover, 0.5)
+
+	lane_cover = cv2.fillPoly(np.zeros_like(img), lane_cover_coords, (255, 105, 180))
+	final_image_moving = cv2.addWeighted(img, 1, lane_cover, 0.5, 0)
 	#cv2.line(final_image_moving, (get_x(m, b, int(H * LANE_CUT)), int(H * LANE_CUT)), (get_x(m, b, H), H), (0, 255, 0), 3)
 		
 

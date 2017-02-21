@@ -18,5 +18,5 @@ def video_test():
 	transformed.write_videofile(OUTPUT_VIDEO, audio=False)
 
 
-img_test()
-#video_test()
+#img_test()
+video_test()
